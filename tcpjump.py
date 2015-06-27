@@ -6,6 +6,7 @@ ap=argparse.ArgumentParser(description='A TCP/UDP Proxy program',usage="Usage: %
 ap.add_argument('-u','--udp',help="UDP Proxy", action="store_true")
 ap.add_argument('-o','--output',type=argparse.FileType('w'),help="Output text to file")
 ap.add_argument('-m','--maxconns',type=int,help="Maximum number of connections in TCP mode",default=5)
+ap.add_argument('-l','--laddress',type=str,help="Local bind address",default='')
 ap.add_argument('lport')
 ap.add_argument('daddress')
 ap.add_argument('dport')
@@ -36,11 +37,11 @@ def killsocket(c):
 
 if args.udp:
 	lsock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	lsock.bind(('',lport))
+	lsock.bind((args.laddress,lport))
 
 else:
 	lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	lsock.bind(('',lport))
+	lsock.bind((args.laddress,lport))
 	lsock.listen(args.maxconns)
 
 allsocks.append(lsock)
@@ -50,18 +51,21 @@ while 1:
 	try:
 		if args.udp:
 			d=lsock.recvfrom(1024)
+			print "Connection from %s:%s"%(d[1][0],d[1][1])
 			if args.output:
 				args.output.write("%s"%d[0])
 			dsock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 			dsock.sendto(d[0],(daddress,dport))
 			r=dsock.recvfrom(1024)
-			args.output.write("%s"%r[0])
+			if args.output:
+				args.output.write("%s"%r[0])
 			lsock.sendto(r[0],d[1])
 		else:
 			a=select.select(allsocks,[],allsocks,60)
 			for b in a[0]:
 				if b == lsock:
-					(csock, address) = lsock.accept()
+					(csock, d) = lsock.accept()
+					print "Connection from %s:%s"%(d[0],d[1])
 					csock.setblocking(0)
 					dsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 					dsock.connect((daddress,dport))
